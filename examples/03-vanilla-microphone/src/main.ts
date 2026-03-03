@@ -1,4 +1,10 @@
-import { createRealtimeBpmAnalyzer, type BpmAnalyzer, type BpmCandidates } from 'realtime-bpm-analyzer';
+import { type BpmCandidates } from 'realtime-bpm-analyzer';
+import {
+  getMicrophoneErrorMessage,
+  startMicrophoneSession,
+  stopMicrophoneSession,
+  type MicrophoneSession,
+} from '../../shared/microphone-session';
 
 // Get DOM elements
 const startBtn = document.getElementById('startBtn') as HTMLButtonElement;
@@ -9,30 +15,17 @@ const bpmValue = document.getElementById('bpmValue') as HTMLDivElement;
 
 // State
 let audioContext: AudioContext | null = null;
-let mediaStream: MediaStream | null = null;
-let source: MediaStreamAudioSourceNode | null = null;
-let bpmAnalyzer: BpmAnalyzer | null = null;
-let analyser: AnalyserNode | null = null;
+let microphoneSession: MicrophoneSession | null = null;
 
 // Start listening to microphone
 startBtn.addEventListener('click', async () => {
   try {
     showStatus('Starting microphone...', 'analyzing');
 
-    // Create audio context
     const audioCtx = audioContext ?? new AudioContext();
     audioContext = audioCtx;
 
-    // Resume audio context if suspended
-    if (audioCtx.state === 'suspended') {
-      await audioCtx.resume();
-    }
-
-    // Request microphone access
-    mediaStream = await navigator.mediaDevices.getUserMedia({ audio: true });
-
-    // Handle the stream
-    await handleStream(audioCtx, mediaStream);
+    microphoneSession = await startMicrophoneSession(audioCtx, onBpmStable);
 
     // Update UI
     startBtn.disabled = true;
@@ -40,48 +33,11 @@ startBtn.addEventListener('click', async () => {
     showStatus('Listening for music - play something!', 'success');
   } catch (error) {
     console.error('Error accessing microphone:', error);
-    
-    let errorMessage = 'Failed to access microphone';
-    if (error instanceof Error) {
-      if (error.name === 'NotAllowedError') {
-        errorMessage = 'Microphone access denied. Please allow microphone access.';
-      } else if (error.name === 'NotFoundError') {
-        errorMessage = 'No microphone found. Please connect a microphone.';
-      } else {
-        errorMessage = error.message;
-      }
-    }
-    
-    showStatus(errorMessage, 'error');
-    cleanup();
+
+    showStatus(getMicrophoneErrorMessage(error), 'error');
+    void cleanup();
   }
 });
-
-async function handleStream(audioCtx: AudioContext, stream: MediaStream) {
-  // Resume audio context
-  await audioCtx.resume();
-
-  // Create BPM analyzer
-  const analyzer = await createRealtimeBpmAnalyzer(audioCtx);
-  bpmAnalyzer = analyzer;
-
-  // Create analyser node for visualization (optional, but following the pattern)
-  const analyserNode = audioCtx.createAnalyser();
-  analyserNode.fftSize = 2048;
-  analyser = analyserNode;
-
-  // Create media stream source
-  const mediaStreamSource = audioCtx.createMediaStreamSource(stream);
-  source = mediaStreamSource;
-
-  // Connect everything together
-  // CRITICAL: BPM analyzer MUST be in the audio graph!
-  mediaStreamSource.connect(analyserNode);
-  mediaStreamSource.connect(analyzer.node);
-
-  // Setup event listeners for BPM detection
-  analyzer.on('bpmStable', onBpmStable);
-}
 
 function onBpmStable(data: BpmCandidates) {
   if (data.bpm.length > 0) {
@@ -92,8 +48,8 @@ function onBpmStable(data: BpmCandidates) {
 }
 
 // Stop listening
-stopBtn.addEventListener('click', () => {
-  disconnect();
+stopBtn.addEventListener('click', async () => {
+  await disconnect();
   showStatus('Stopped listening', 'analyzing');
   hideBpm();
 });
@@ -115,46 +71,34 @@ function hideBpm() {
 }
 
 async function disconnect(): Promise<void> {
-  if (!audioContext || !source || !bpmAnalyzer || !analyser) {
-    return;
+  if (microphoneSession) {
+    stopMicrophoneSession(microphoneSession);
+    microphoneSession = null;
   }
 
-  await audioContext.suspend();
-
-  // Disconnect everything
-  source.disconnect();
-  analyser.disconnect();
-  bpmAnalyzer.disconnect();
+  if (audioContext && audioContext.state !== 'closed') {
+    await audioContext.close();
+    audioContext = null;
+  }
 
   // Reset UI
   startBtn.disabled = false;
   stopBtn.disabled = true;
 }
 
-function cleanup() {
-  if (source) {
-    source.disconnect();
-    source = null;
-  }
-
-  if (analyser) {
-    analyser.disconnect();
-    analyser = null;
-  }
-
-  if (bpmAnalyzer) {
-    bpmAnalyzer.disconnect();
-    bpmAnalyzer = null;
-  }
-
-  if (mediaStream) {
-    mediaStream.getTracks().forEach(track => track.stop());
-    mediaStream = null;
-  }
-
-  startBtn.disabled = false;
-  stopBtn.disabled = true;
+async function cleanup() {
+  await disconnect();
 }
 
 // Cleanup on page unload
-window.addEventListener('beforeunload', cleanup);
+window.addEventListener('beforeunload', () => {
+  if (microphoneSession) {
+    stopMicrophoneSession(microphoneSession);
+    microphoneSession = null;
+  }
+
+  if (audioContext) {
+    void audioContext.close();
+    audioContext = null;
+  }
+});

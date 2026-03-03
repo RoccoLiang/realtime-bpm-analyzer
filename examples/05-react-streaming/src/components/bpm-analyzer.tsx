@@ -20,13 +20,11 @@ function BpmAnalyzer() {
   const bpmAnalyzerRef = useRef<BpmAnalyzerType | null>(null);
   const biquadFilterRef = useRef<BiquadFilterNode | null>(null);
 
-  // Initialize audio context
   useEffect(() => {
-    audioContextRef.current = new AudioContext();
-
     return () => {
       cleanup();
-      audioContextRef.current?.close();
+      void audioContextRef.current?.close();
+      audioContextRef.current = null;
     };
   }, []);
 
@@ -67,8 +65,8 @@ function BpmAnalyzer() {
       setIsLoading(true);
       setError(undefined);
 
-      const audioContext = audioContextRef.current;
-      if (!audioContext) throw new Error('Audio context not initialized');
+      const audioContext = audioContextRef.current ?? new AudioContext();
+      audioContextRef.current = audioContext;
 
       if (audioContext.state === 'suspended') {
         await audioContext.resume();

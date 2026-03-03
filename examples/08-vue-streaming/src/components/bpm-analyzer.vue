@@ -19,8 +19,11 @@ let mediaSource: MediaElementAudioSourceNode | null = null;
 let bpmAnalyzer: BpmAnalyzer | null = null;
 let biquadFilter: BiquadFilterNode | null = null;
 
-// Initialize audio context
-audioContext = new AudioContext();
+const getAudioContext = (): AudioContext => {
+  const current = audioContext ?? new AudioContext();
+  audioContext = current;
+  return current;
+};
 
 const cleanup = () => {
   if (audioElement) {
@@ -59,10 +62,10 @@ const handleLoad = async () => {
     isLoading.value = true;
     error.value = undefined;
 
-    if (!audioContext) throw new Error('Audio context not initialized');
+    const audioCtx = getAudioContext();
 
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume();
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
     }
 
     // Create audio element
@@ -70,11 +73,11 @@ const handleLoad = async () => {
     audioElement.crossOrigin = 'anonymous';
 
     // Create BPM analyzer
-    const analyzer = await createRealtimeBpmAnalyzer(audioContext);
+    const analyzer = await createRealtimeBpmAnalyzer(audioCtx);
     bpmAnalyzer = analyzer;
 
     // Create biquad filter
-    const filter = getBiquadFilter(audioContext);
+    const filter = getBiquadFilter(audioCtx);
     biquadFilter = filter;
 
     // Listen for BPM stable events
@@ -85,12 +88,12 @@ const handleLoad = async () => {
     });
 
     // Create media source and connect
-    const source = audioContext.createMediaElementSource(audioElement);
+    const source = audioCtx.createMediaElementSource(audioElement);
     mediaSource = source;
 
     source.connect(filter);
     filter.connect(analyzer.node);
-    source.connect(audioContext.destination);
+    source.connect(audioCtx.destination);
 
     // Wait for audio to be ready
     await new Promise<void>((resolve, reject) => {

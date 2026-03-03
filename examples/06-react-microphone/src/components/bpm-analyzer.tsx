@@ -1,9 +1,11 @@
 import { useState, useEffect, useRef } from 'react';
-import { 
-  createRealtimeBpmAnalyzer, 
-  type BpmAnalyzer as BpmAnalyzerType, 
-  type BpmCandidates 
-} from 'realtime-bpm-analyzer';
+import { type BpmCandidates } from 'realtime-bpm-analyzer';
+import {
+  getMicrophoneErrorMessage,
+  startMicrophoneSession,
+  stopMicrophoneSession,
+  type MicrophoneSession,
+} from '../../../shared/microphone-session';
 import './bpm-analyzer.css';
 
 function BpmAnalyzer() {
@@ -12,109 +14,61 @@ function BpmAnalyzer() {
   const [error, setError] = useState<string | undefined>();
   
   const audioContextRef = useRef<AudioContext | null>(null);
-  const mediaStreamRef = useRef<MediaStream | null>(null);
-  const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const bpmAnalyzerRef = useRef<BpmAnalyzerType | null>(null);
-  const analyserRef = useRef<AnalyserNode | null>(null);
+  const microphoneSessionRef = useRef<MicrophoneSession | null>(null);
 
-  // Initialize audio context
   useEffect(() => {
-    audioContextRef.current = new AudioContext();
-
     return () => {
-      disconnect().catch((error) => {
-        console.error('Error during cleanup on unmount', error);
+      void disconnect().finally(() => {
+        void audioContextRef.current?.close();
+        audioContextRef.current = null;
       });
-      audioContextRef.current?.close();
     };
   }, []);
 
   const disconnect = async () => {
-    if (!audioContextRef.current || !sourceRef.current || !bpmAnalyzerRef.current || !analyserRef.current) {
-      return;
+    if (microphoneSessionRef.current) {
+      stopMicrophoneSession(microphoneSessionRef.current);
+      microphoneSessionRef.current = null;
     }
 
-    await audioContextRef.current.suspend();
-
-    sourceRef.current.disconnect();
-    analyserRef.current.disconnect();
-    bpmAnalyzerRef.current.disconnect();
-
-    if (mediaStreamRef.current) {
-      mediaStreamRef.current.getTracks().forEach(track => track.stop());
-      mediaStreamRef.current = null;
+    if (audioContextRef.current && audioContextRef.current.state === 'running') {
+      await audioContextRef.current.suspend();
     }
 
     setIsRecording(false);
     setBpm(undefined);
   };
 
-  const handleStream = async (audioCtx: AudioContext, stream: MediaStream) => {
-    await audioCtx.resume();
-
-    // Create BPM analyzer
-    const analyzer = await createRealtimeBpmAnalyzer(audioCtx);
-    bpmAnalyzerRef.current = analyzer;
-
-    // Create analyser node
-    const analyserNode = audioCtx.createAnalyser();
-    analyserNode.fftSize = 2048;
-    analyserRef.current = analyserNode;
-
-    // Create media stream source
-    const mediaStreamSource = audioCtx.createMediaStreamSource(stream);
-    sourceRef.current = mediaStreamSource;
-
-    // Connect everything together
-    mediaStreamSource.connect(analyserNode);
-    mediaStreamSource.connect(analyzer.node);
-
-    // Setup event listeners
-    analyzer.on('bpmStable', (data: BpmCandidates) => {
-      if (data.bpm.length > 0) {
-        setBpm(data.bpm[0].tempo);
-      }
-    });
-  };
-
   const handleStart = async () => {
     try {
       setError(undefined);
 
-      const audioCtx = audioContextRef.current;
-      if (!audioCtx) throw new Error('Audio context not initialized');
+      const audioCtx = audioContextRef.current ?? new AudioContext();
+      audioContextRef.current = audioCtx;
 
       if (audioCtx.state === 'suspended') {
         await audioCtx.resume();
       }
 
-      // Request microphone access
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      mediaStreamRef.current = stream;
-
-      await handleStream(audioCtx, stream);
+      microphoneSessionRef.current = await startMicrophoneSession(
+        audioCtx,
+        (data: BpmCandidates) => {
+          if (data.bpm.length > 0) {
+            setBpm(data.bpm[0].tempo);
+          }
+        },
+      );
 
       setIsRecording(true);
     } catch (err) {
       console.error('Error accessing microphone:', err);
-      
-      let errorMessage = 'Failed to access microphone';
-      if (err instanceof Error) {
-        if (err.name === 'NotAllowedError') {
-          errorMessage = 'Microphone access denied. Please allow microphone access.';
-        } else if (err.name === 'NotFoundError') {
-          errorMessage = 'No microphone found. Please connect a microphone.';
-        } else {
-          errorMessage = err.message;
-        }
-      }
-      
-      setError(errorMessage);
+
+      setError(getMicrophoneErrorMessage(err));
     }
   };
 
   const handleStop = () => {
-    disconnect();
+    void disconnect();
   };
 
   return (

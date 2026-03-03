@@ -1,104 +1,59 @@
 <script setup lang="ts">
 import { ref, onUnmounted } from 'vue';
-import { 
-  createRealtimeBpmAnalyzer, 
-  type BpmAnalyzer, 
-  type BpmCandidates 
-} from 'realtime-bpm-analyzer';
+import { type BpmCandidates } from 'realtime-bpm-analyzer';
+import {
+  getMicrophoneErrorMessage,
+  startMicrophoneSession,
+  stopMicrophoneSession,
+  type MicrophoneSession,
+} from '../../../shared/microphone-session';
 
 const bpm = ref<number>();
 const isRecording = ref(false);
 const error = ref<string>();
 
 let audioContext: AudioContext | null = null;
-let mediaStream: MediaStream | null = null;
-let source: MediaStreamAudioSourceNode | null = null;
-let bpmAnalyzer: BpmAnalyzer | null = null;
-let analyser: AnalyserNode | null = null;
-
-// Initialize audio context
-audioContext = new AudioContext();
+let microphoneSession: MicrophoneSession | null = null;
 
 const disconnect = async () => {
-  if (!audioContext || !source || !bpmAnalyzer || !analyser) {
-    return;
+  if (microphoneSession) {
+    stopMicrophoneSession(microphoneSession);
+    microphoneSession = null;
   }
 
-  await audioContext.suspend();
-
-  source.disconnect();
-  analyser.disconnect();
-  bpmAnalyzer.disconnect();
-
-  if (mediaStream) {
-    mediaStream.getTracks().forEach(track => track.stop());
-    mediaStream = null;
+  if (audioContext && audioContext.state === 'running') {
+    await audioContext.suspend();
   }
 
   isRecording.value = false;
   bpm.value = undefined;
 };
 
-const handleStream = async (audioCtx: AudioContext, stream: MediaStream) => {
-  await audioCtx.resume();
-
-  // Create BPM analyzer
-  const analyzer = await createRealtimeBpmAnalyzer(audioCtx);
-  bpmAnalyzer = analyzer;
-
-  // Create analyser node
-  const analyserNode = audioCtx.createAnalyser();
-  analyserNode.fftSize = 2048;
-  analyser = analyserNode;
-
-  // Create media stream source
-  const mediaStreamSource = audioCtx.createMediaStreamSource(stream);
-  source = mediaStreamSource;
-
-  // Connect everything together
-  mediaStreamSource.connect(analyserNode);
-  mediaStreamSource.connect(analyzer.node);
-
-  // Setup event listeners
-  analyzer.on('bpmStable', (data: BpmCandidates) => {
-    if (data.bpm.length > 0) {
-      bpm.value = data.bpm[0].tempo;
-    }
-  });
-};
-
 const handleStart = async () => {
   try {
     error.value = undefined;
 
-    if (!audioContext) throw new Error('Audio context not initialized');
+    const audioCtx = audioContext ?? new AudioContext();
+    audioContext = audioCtx;
 
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume();
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
     }
 
-    // Request microphone access
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    mediaStream = stream;
-
-    await handleStream(audioContext, stream);
+    microphoneSession = await startMicrophoneSession(
+      audioCtx,
+      (data: BpmCandidates) => {
+        if (data.bpm.length > 0) {
+          bpm.value = data.bpm[0].tempo;
+        }
+      },
+    );
 
     isRecording.value = true;
   } catch (err) {
     console.error('Error accessing microphone:', err);
-    
-    let errorMessage = 'Failed to access microphone';
-    if (err instanceof Error) {
-      if (err.name === 'NotAllowedError') {
-        errorMessage = 'Microphone access denied. Please allow microphone access.';
-      } else if (err.name === 'NotFoundError') {
-        errorMessage = 'No microphone found. Please connect a microphone.';
-      } else {
-        errorMessage = err.message;
-      }
-    }
-    
-    error.value = errorMessage;
+
+    error.value = getMicrophoneErrorMessage(err);
   }
 };
 
@@ -107,8 +62,10 @@ const handleStop = () => {
 };
 
 onUnmounted(() => {
-  disconnect();
-  audioContext?.close();
+  void disconnect().finally(() => {
+    void audioContext?.close();
+    audioContext = null;
+  });
 });
 </script>
 

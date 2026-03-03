@@ -6,8 +6,13 @@ const statusElement = document.getElementById('status') as HTMLDivElement;
 const bpmDisplay = document.getElementById('bpmDisplay') as HTMLDivElement;
 const bpmValue = document.getElementById('bpmValue') as HTMLDivElement;
 
-// Create audio context
-const audioContext = new AudioContext();
+let audioContext: AudioContext | null = null;
+
+function getAudioContext(): AudioContext {
+  const current = audioContext ?? new AudioContext();
+  audioContext = current;
+  return current;
+}
 
 // Handle file selection
 audioFileInput.addEventListener('change', async (event) => {
@@ -19,16 +24,18 @@ audioFileInput.addEventListener('change', async (event) => {
     showStatus('Analyzing...', 'analyzing');
     hideBpm();
 
+    const audioCtx = getAudioContext();
+
     // Resume audio context if suspended
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume();
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
     }
 
     // Read file as array buffer
     const arrayBuffer = await file.arrayBuffer();
 
     // Decode audio data
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
     // Analyze the full buffer to get BPM candidates
     const tempos = await analyzeFullBuffer(audioBuffer);
@@ -66,3 +73,8 @@ function hideBpm() {
   bpmDisplay.classList.remove('visible');
   bpmValue.textContent = '--';
 }
+
+window.addEventListener('beforeunload', () => {
+  void audioContext?.close();
+  audioContext = null;
+});

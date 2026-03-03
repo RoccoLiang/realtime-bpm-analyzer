@@ -10,8 +10,13 @@ const statusElement = document.getElementById('status') as HTMLDivElement;
 const bpmDisplay = document.getElementById('bpmDisplay') as HTMLDivElement;
 const bpmValue = document.getElementById('bpmValue') as HTMLDivElement;
 
-// Create audio context
-const audioContext = new AudioContext();
+let audioContext: AudioContext | null = null;
+
+function getAudioContext(): AudioContext {
+  const current = audioContext ?? new AudioContext();
+  audioContext = current;
+  return current;
+}
 
 // State
 let audioElement: HTMLAudioElement | null = null;
@@ -33,9 +38,11 @@ loadBtn.addEventListener('click', async () => {
 
     showStatus('Loading audio...', 'analyzing');
 
+    const audioCtx = getAudioContext();
+
     // Resume audio context if suspended
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume();
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
     }
 
     // Create audio element
@@ -43,10 +50,10 @@ loadBtn.addEventListener('click', async () => {
     audioElement.crossOrigin = 'anonymous';
 
     // Create BPM analyzer
-    bpmAnalyzer = await createRealtimeBpmAnalyzer(audioContext);
+    bpmAnalyzer = await createRealtimeBpmAnalyzer(audioCtx);
 
     // Create biquad filter for better audio processing
-    biquadFilter = getBiquadFilter(audioContext);
+    biquadFilter = getBiquadFilter(audioCtx);
 
     // Listen for BPM stable events
     bpmAnalyzer.on('bpmStable', (data: BpmCandidates) => {
@@ -58,12 +65,12 @@ loadBtn.addEventListener('click', async () => {
     });
 
     // Create media source and connect the audio graph
-    mediaSource = audioContext.createMediaElementSource(audioElement);
+    mediaSource = audioCtx.createMediaElementSource(audioElement);
     
     // Connect: source → filter → analyzer → destination
     mediaSource.connect(biquadFilter);
     biquadFilter.connect(bpmAnalyzer.node);
-    mediaSource.connect(audioContext.destination);
+    mediaSource.connect(audioCtx.destination);
 
     // Wait for audio to be ready
     await new Promise<void>((resolve, reject) => {
@@ -88,8 +95,9 @@ playBtn.addEventListener('click', async () => {
   if (!audioElement) return;
 
   try {
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume();
+    const audioCtx = audioContext;
+    if (audioCtx?.state === 'suspended') {
+      await audioCtx.resume();
     }
     await audioElement.play();
     showStatus('Playing and analyzing...', 'playing');
@@ -168,4 +176,8 @@ function cleanup() {
 }
 
 // Cleanup on page unload
-window.addEventListener('beforeunload', cleanup);
+window.addEventListener('beforeunload', () => {
+  cleanup();
+  void audioContext?.close();
+  audioContext = null;
+});

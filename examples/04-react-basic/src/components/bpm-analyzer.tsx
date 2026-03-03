@@ -9,12 +9,10 @@ function BpmAnalyzer() {
   
   const audioContextRef = useRef<AudioContext | null>(null);
 
-  // Initialize audio context
   useEffect(() => {
-    audioContextRef.current = new AudioContext();
-
     return () => {
-      audioContextRef.current?.close();
+      void audioContextRef.current?.close();
+      audioContextRef.current = null;
     };
   }, []);
 
@@ -28,8 +26,8 @@ function BpmAnalyzer() {
       setError(undefined);
       setBpm(undefined);
 
-      const audioContext = audioContextRef.current;
-      if (!audioContext) throw new Error('Audio context not initialized');
+      const audioContext = audioContextRef.current ?? new AudioContext();
+      audioContextRef.current = audioContext;
 
       // Resume audio context if suspended
       if (audioContext.state === 'suspended') {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onUnmounted } from 'vue';
 import { analyzeFullBuffer } from 'realtime-bpm-analyzer';
 
 const bpm = ref<number | undefined>();
@@ -8,9 +8,11 @@ const error = ref<string | undefined>();
 
 let audioContext: AudioContext | null = null;
 
-onMounted(() => {
-  audioContext = new AudioContext();
-});
+const getAudioContext = (): AudioContext => {
+  const current = audioContext ?? new AudioContext();
+  audioContext = current;
+  return current;
+};
 
 onUnmounted(() => {
   audioContext?.close();
@@ -26,16 +28,16 @@ const handleFileChange = async (event: Event) => {
     error.value = undefined;
     bpm.value = undefined;
 
-    if (!audioContext) throw new Error('Audio context not initialized');
+    const audioCtx = getAudioContext();
 
     // Resume audio context if suspended
-    if (audioContext.state === 'suspended') {
-      await audioContext.resume();
+    if (audioCtx.state === 'suspended') {
+      await audioCtx.resume();
     }
 
     // Read and decode audio file
     const arrayBuffer = await file.arrayBuffer();
-    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
 
     // Analyze the full buffer to get BPM candidates
     const tempos = await analyzeFullBuffer(audioBuffer);
