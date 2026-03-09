@@ -1,11 +1,11 @@
 {
   "name": "realtime-bpm-analyzer",
   "version": "5.0.1",
-  "description": "This dependency free library can analyze the BPM (Tempo) of an audio/video node or any stream in realtime on your browser",
+  "description": "Real-time BPM and Musical Key detection library for Web Audio API",
   "author": {
     "name": "David Lepaux",
     "email": "d.lepaux@gmail.com",
-    "url": "https://github.com/dlepaux"
+    "url": "https://github.com/RoccoLiang"
   },
   "keywords": [
     "webaudioapi",
@@ -18,7 +18,10 @@
     "tempo",
     "bpm",
     "beats",
-    "analyzer"
+    "analyzer",
+    "musical-key",
+    "key-detection",
+    "chromagram"
   ],
   "license": "Apache-2.0",
   "main": "dist/index.js",
@@ -39,41 +42,23 @@
   "files": [
     "dist",
     "readme.md",
-    "licence.md"
+    "license.md"
   ],
   "sideEffects": false,
   "publishConfig": {
     "access": "public",
     "provenance": true
   },
-  "workspaces": [
-    "examples/*"
-  ],
   "scripts": {
+    "dev": "cd examples/03-vanilla-microphone && npm run dev",
     "build": "bash bin/build/library.sh",
-    "ensure:dist": "bash bin/examples/ensure-dist.sh",
-    "docs:dev": "cd docs && npm run dev",
-    "docs:build": "cd docs && npm run build",
-    "docs:preview": "cd docs && npm run preview",
-    "examples:install": "npm install --workspaces",
-    "examples:build": "npm run ensure:dist && npm run build --workspaces --if-present",
-    "examples:select": "bash bin/examples/select.sh",
-    "examples:dev": "npm run ensure:dist && cd docs && npm run dev:examples",
     "lint": "xo",
     "lint:fix": "xo --fix",
-    "prepare": "husky",
-    "testing:prepare": "ts-node testing/tools/generate-manifest.ts",
-    "testing": "web-dev-server",
-    "test": "web-test-runner",
-    "test:watch": "web-test-runner --watch",
-    "test:unit": "web-test-runner --files 'tests/unit/**/*.test.ts'",
-    "test:integration": "web-test-runner --files 'tests/integration/**/*.test.ts'",
-    "test:lib": "web-test-runner --files 'tests/lib/**/*.ts'",
-    "test:coverage": "web-test-runner --coverage"
+    "prepare": "husky"
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dlepaux/realtime-bpm-analyzer"
+    "url": "https://github.com/RoccoLiang/realtime-bpm-analyzer.git"
   },
   "devDependencies": {
     "@commitlint/cli": "^18.5.0",
@@ -83,18 +68,8 @@
     "@semantic-release/git": "^10.0.1",
     "@semantic-release/npm": "^13.1.2",
     "@semantic-release/release-notes-generator": "^14.1.0",
-    "@types/chai": "^4.3.11",
-    "@types/mocha": "^10.0.6",
-    "@web/dev-server": "^0.4.1",
-    "@web/dev-server-esbuild": "^1.0.1",
-    "@web/test-runner": "^0.18.0",
-    "@web/test-runner-puppeteer": "^0.18.0",
-    "chai": "^5.0.3",
-    "esbuild": "^0.25.0",
-    "eslint": "^8.56.0",
+    "esbuild": "^0.27.3",
     "husky": "^8.0.3",
-    "mocha": "^10.2.0",
-    "music-metadata": "^7.14.0",
     "semantic-release": "^25.0.2",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3",
@@ -105,7 +80,7 @@
     "semicolon": true,
     "ignores": [
       "examples/**",
-      "docs/scripts/**"
+      "build.ts"
     ],
     "globals": [
       "process",
