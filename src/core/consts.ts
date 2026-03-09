@@ -6,6 +6,13 @@ export const thresholdStep = 0.05;
 export const frequencyValue = 200;
 export const qualityValue = 1;
 
+// Key Detection constants
+export const defaultKeyStabilizationTime = 30000; // MS
+export const keyConfidenceThreshold = 0.6;
+export const keyDetectionMinSeconds = 2;
+export const maxAudioBufferSeconds = 30;
+export const keyDetectionIntervalMs = 1000;
+
 /**
  * Minimum BPM value for tempo normalization
  * @remarks

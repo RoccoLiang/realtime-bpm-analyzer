@@ -122,6 +122,40 @@
         color: #155724;
         border: 1px solid #c3e6cb;
       }
+
+      .energy-panel {
+        padding: 16px;
+        border-radius: 12px;
+        border: 1px solid #e8e8ef;
+        margin-bottom: 20px;
+      }
+
+      .energy-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 8px;
+        font-size: 13px;
+        color: #444;
+      }
+
+      .energy-value {
+        font-weight: 700;
+      }
+
+      .energy-bar {
+        width: 100%;
+        height: 10px;
+        background: #ececf4;
+        border-radius: 999px;
+        overflow: hidden;
+      }
+
+      .energy-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #41c980 0%, #f8c146 60%, #ef5b5b 100%);
+        transition: width 0.2s ease;
+      }
     </style>
   </head>
   <body>
@@ -134,6 +168,16 @@
       </div>
 
       <div class="status" id="status"></div>
+
+      <div class="energy-panel">
+        <div class="energy-header">
+          <span>Energy</span>
+          <span class="energy-value"><span id="energyValue">0</span>% · <span id="energyLevel">Low</span></span>
+        </div>
+        <div class="energy-bar">
+          <div class="energy-fill" id="energyFill"></div>
+        </div>
+      </div>
 
       <div class="bpm-display" id="bpmDisplay">
         <div class="bpm-value" id="bpmValue">--</div>

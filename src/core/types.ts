@@ -5,6 +5,8 @@
 export type ProcessorOutputEvent =
   | {type: 'bpm'; data: BpmCandidates}
   | {type: 'bpmStable'; data: BpmCandidates}
+  | {type: 'key'; data: KeyCandidates}
+  | {type: 'keyStable'; data: KeyCandidates}
   | {type: 'analyzerReset'}
   | {type: 'analyzeChunk'; data: Float32Array}
   | {type: 'validPeak'; data: {threshold: Threshold; index: number}}
@@ -35,6 +37,10 @@ export type BpmAnalyzerEventMap = {
   bpm: BpmCandidates;
   /** Emitted when BPM detection has stabilized with high confidence */
   bpmStable: BpmCandidates;
+  /** Emitted continuously during key analysis with current key candidates */
+  key: KeyCandidates;
+  /** Emitted when key detection has stabilized with high confidence */
+  keyStable: KeyCandidates;
   /** Emitted when the analyzer state has been reset */
   analyzerReset: void;
   /** Emitted in debug mode when analyzing audio chunks */
@@ -125,6 +131,10 @@ export type RealTimeBpmAnalyzerParameters = {
   muteTimeInIndexes?: number;
   /** Enable debug event logging (default: false) */
   debug?: boolean;
+  /** Time in milliseconds to consider Key stable (default: 30000) */
+  keyStabilizationTime?: number;
+  /** Enable key detection (default: true) */
+  enableKeyDetection?: boolean;
 };
 
 /**
@@ -136,6 +146,8 @@ export type RealTimeBpmAnalyzerOptions = {
   stabilizationTime: number;
   muteTimeInIndexes: number;
   debug: boolean;
+  keyStabilizationTime: number;
+  enableKeyDetection: boolean;
 };
 
 /**
@@ -243,4 +255,64 @@ export type NormalizedFilters = {
 export type BiquadFilterOptions = {
   frequencyValue?: number;
   qualityValue?: number;
+};
+
+/**
+ * Musical key root note names (12 semitones)
+ * @group Type Aliases
+ */
+export type KeyRoot = 'C' | 'C#' | 'D' | 'D#' | 'E' | 'F' | 'F#' | 'G' | 'G#' | 'A' | 'A#' | 'B';
+
+/**
+ * Musical key mode
+ * @group Type Aliases
+ */
+export type KeyMode = 'major' | 'minor';
+
+/**
+ * Musical key detection result
+ * @group Type Aliases
+ */
+export type KeyCandidates = {
+  /** Detected key root note */
+  readonly key: KeyRoot;
+  /** Detected mode (major or minor) */
+  readonly mode: KeyMode;
+  /** Confidence score (0-1, higher = more confident) */
+  readonly confidence: number;
+  /** Chroma vector (12 values for each semitone) */
+  readonly chroma: readonly number[];
+};
+
+/**
+ * Key detection options
+ * @group Type Aliases
+ */
+export type KeyDetectOptions = {
+  /** Audio sample rate */
+  audioSampleRate: number;
+  /** Audio channel data */
+  channelData: Float32Array;
+  /** FFT size (default: 2048) */
+  fftSize?: number;
+};
+
+/**
+ * Configuration options for the real-time Key analyzer
+ * @group Type Aliases
+ */
+export type RealTimeKeyAnalyzerParameters = {
+  /** Time in ms to accumulate before outputting stable key (default: 30000) */
+  stabilizationTime?: number;
+  /** Enable debug event logging (default: false) */
+  debug?: boolean;
+};
+
+/**
+ * Internal key analyzer options with required fields
+ * @internal
+ */
+export type RealTimeKeyAnalyzerOptions = {
+  stabilizationTime: number;
+  debug: boolean;
 };

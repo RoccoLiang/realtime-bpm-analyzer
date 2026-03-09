@@ -5,121 +5,236 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>BPM Analyzer - Microphone Input</title>
     <style>
+      @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;500;700&display=swap');
+
       * {
         margin: 0;
         padding: 0;
         box-sizing: border-box;
       }
 
+      :root {
+        --neon-cyan: #00f3ff;
+        --neon-magenta: #ff00ff;
+        --neon-yellow: #ffff00;
+        --neon-pink: #ff0080;
+        --dark-bg: #0a0a0f;
+        --dark-panel: #12121a;
+        --dark-border: #1a1a2e;
+        --text-dim: #6b6b8a;
+      }
+
       body {
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        font-family: 'Rajdhani', sans-serif;
+        background: 
+          linear-gradient(180deg, #0a0a0f 0%, #0f0f1a 50%, #0a0a0f 100%);
         min-height: 100vh;
         display: flex;
         align-items: center;
         justify-content: center;
         padding: 20px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      body::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: 
+          repeating-linear-gradient(
+            0deg,
+            transparent,
+            transparent 2px,
+            rgba(0, 243, 255, 0.03) 2px,
+            rgba(0, 243, 255, 0.03) 4px
+          );
+        pointer-events: none;
+        z-index: 1;
       }
 
       .container {
-        background: white;
-        border-radius: 20px;
-        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
-        padding: 40px;
+        background: linear-gradient(145deg, #12121a, #0d0d14);
+        border: 1px solid #1a1a2e;
+        border-radius: 4px;
+        padding: 30px;
         max-width: 500px;
         width: 100%;
+        position: relative;
+        z-index: 2;
+        box-shadow: 
+          0 0 40px rgba(0, 243, 255, 0.1),
+          inset 0 0 60px rgba(0, 0, 0, 0.5);
+      }
+
+      .container::before {
+        content: '';
+        position: absolute;
+        top: -1px;
+        left: 20px;
+        right: 20px;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, var(--neon-cyan), transparent);
       }
 
       h1 {
-        font-size: 28px;
-        margin-bottom: 10px;
-        color: #333;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 22px;
+        margin-bottom: 8px;
+        color: var(--neon-cyan);
+        text-transform: uppercase;
+        letter-spacing: 4px;
+        text-shadow: 0 0 20px var(--neon-cyan);
       }
 
       .subtitle {
-        color: #666;
-        margin-bottom: 30px;
-        font-size: 14px;
+        color: var(--text-dim);
+        margin-bottom: 25px;
+        font-size: 13px;
+        letter-spacing: 1px;
       }
 
       .controls {
         display: flex;
-        gap: 10px;
+        gap: 12px;
         margin-bottom: 20px;
       }
 
       button {
         flex: 1;
-        padding: 15px;
-        border: none;
-        border-radius: 10px;
-        font-size: 14px;
+        padding: 14px;
+        border: 1px solid;
+        border-radius: 2px;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 12px;
         font-weight: 600;
         cursor: pointer;
         transition: all 0.3s ease;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      button::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: -100%;
+        width: 100%;
+        height: 100%;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.2), transparent);
+        transition: left 0.5s ease;
+      }
+
+      button:hover::before {
+        left: 100%;
       }
 
       #startBtn {
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        color: white;
+        background: transparent;
+        border-color: var(--neon-cyan);
+        color: var(--neon-cyan);
+        box-shadow: 0 0 15px rgba(0, 243, 255, 0.3), inset 0 0 15px rgba(0, 243, 255, 0.1);
       }
 
       #startBtn:hover:not(:disabled) {
-        transform: translateY(-2px);
-        box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+        background: rgba(0, 243, 255, 0.15);
+        box-shadow: 0 0 30px rgba(0, 243, 255, 0.5), inset 0 0 20px rgba(0, 243, 255, 0.2);
       }
 
       #stopBtn {
-        background: #f0f0f0;
-        color: #333;
+        background: transparent;
+        border-color: var(--neon-magenta);
+        color: var(--neon-magenta);
+        box-shadow: 0 0 15px rgba(255, 0, 255, 0.3), inset 0 0 15px rgba(255, 0, 255, 0.1);
       }
 
       #stopBtn:hover:not(:disabled) {
-        background: #e0e0e0;
+        background: rgba(255, 0, 255, 0.15);
+        box-shadow: 0 0 30px rgba(255, 0, 255, 0.5), inset 0 0 20px rgba(255, 0, 255, 0.2);
       }
 
       button:disabled {
-        opacity: 0.5;
+        opacity: 0.3;
         cursor: not-allowed;
+        box-shadow: none;
       }
 
       .bpm-display {
         text-align: center;
         padding: 30px;
-        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-        border-radius: 15px;
+        background: linear-gradient(180deg, rgba(0, 243, 255, 0.05) 0%, rgba(255, 0, 255, 0.05) 100%);
+        border: 1px solid #1a1a2e;
+        border-radius: 4px;
         margin-bottom: 20px;
         opacity: 0;
-        transform: translateY(10px);
+        transform: scale(0.95);
         transition: all 0.5s ease;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .bpm-display::before {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: linear-gradient(45deg, transparent 40%, rgba(0, 243, 255, 0.1) 50%, transparent 60%);
+        animation: shimmer 2s infinite;
+      }
+
+      @keyframes shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(100%); }
       }
 
       .bpm-display.visible {
         opacity: 1;
-        transform: translateY(0);
+        transform: scale(1);
       }
 
       .bpm-value {
-        font-size: 64px;
-        font-weight: bold;
-        color: white;
+        font-family: 'Orbitron', sans-serif;
+        font-size: 72px;
+        font-weight: 900;
+        color: var(--neon-cyan);
         margin-bottom: 5px;
+        text-shadow: 
+          0 0 20px var(--neon-cyan),
+          0 0 40px var(--neon-cyan),
+          0 0 60px rgba(0, 243, 255, 0.5);
+        animation: pulse 2s ease-in-out infinite;
+      }
+
+      @keyframes pulse {
+        0%, 100% { opacity: 1; }
+        50% { opacity: 0.8; }
       }
 
       .bpm-label {
-        font-size: 18px;
-        color: rgba(255, 255, 255, 0.9);
+        font-family: 'Orbitron', sans-serif;
+        font-size: 14px;
+        color: var(--neon-magenta);
         text-transform: uppercase;
-        letter-spacing: 2px;
+        letter-spacing: 6px;
+        text-shadow: 0 0 10px var(--neon-magenta);
       }
 
       .status {
-        padding: 15px;
-        border-radius: 10px;
+        padding: 12px;
+        border-radius: 2px;
         margin-bottom: 20px;
-        font-size: 14px;
+        font-size: 12px;
         text-align: center;
         display: none;
+        font-family: 'Orbitron', sans-serif;
+        letter-spacing: 1px;
       }
 
       .status.visible {
@@ -127,35 +242,195 @@
       }
 
       .status.analyzing {
-        background: #fff3cd;
-        color: #856404;
-        border: 1px solid #ffeaa7;
+        background: rgba(255, 255, 0, 0.1);
+        color: var(--neon-yellow);
+        border: 1px solid rgba(255, 255, 0, 0.3);
+        text-shadow: 0 0 10px var(--neon-yellow);
       }
 
       .status.error {
-        background: #f8d7da;
-        color: #721c24;
-        border: 1px solid #f5c6cb;
+        background: rgba(255, 0, 128, 0.1);
+        color: var(--neon-pink);
+        border: 1px solid rgba(255, 0, 128, 0.3);
+        text-shadow: 0 0 10px var(--neon-pink);
       }
 
       .status.success {
-        background: #d4edda;
-        color: #155724;
-        border: 1px solid #c3e6cb;
+        background: rgba(0, 255, 128, 0.1);
+        color: #00ff80;
+        border: 1px solid rgba(0, 255, 128, 0.3);
+        text-shadow: 0 0 10px #00ff80;
+      }
+
+      .energy-panel {
+        padding: 16px;
+        border: 1px solid var(--dark-border);
+        border-radius: 2px;
+        margin-bottom: 20px;
+        background: rgba(0, 0, 0, 0.3);
+      }
+
+      .energy-header {
+        display: flex;
+        justify-content: space-between;
+        margin-bottom: 10px;
+        font-size: 11px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        font-family: 'Orbitron', sans-serif;
+      }
+
+      .energy-value {
+        font-weight: 700;
+        color: var(--neon-cyan);
+      }
+
+      .energy-bar {
+        width: 100%;
+        height: 6px;
+        background: #0a0a0f;
+        border-radius: 2px;
+        overflow: hidden;
+        position: relative;
+      }
+
+      .energy-bar::after {
+        content: '';
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: repeating-linear-gradient(
+          90deg,
+          transparent,
+          transparent 8px,
+          rgba(0, 0, 0, 0.5) 8px,
+          rgba(0, 0, 0, 0.5) 16px
+        );
+      }
+
+      .energy-fill {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, 
+          #00ff80 0%, 
+          var(--neon-cyan) 40%, 
+          var(--neon-yellow) 70%, 
+          var(--neon-pink) 100%
+        );
+        transition: width 0.12s linear;
+        box-shadow: 0 0 10px currentColor;
+        position: relative;
+      }
+
+      .energy-fill::after {
+        content: '';
+        position: absolute;
+        right: 0;
+        top: 0;
+        bottom: 0;
+        width: 20px;
+        background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5));
+      }
+
+      .spectrum-panel {
+        border: 1px solid var(--dark-border);
+        border-radius: 2px;
+        padding: 12px;
+        margin-bottom: 20px;
+        background: rgba(0, 0, 0, 0.3);
+      }
+
+      .spectrum-title {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 10px;
+        color: var(--text-dim);
+        margin-bottom: 8px;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+      }
+
+      #spectrumCanvas {
+        width: 100%;
+        height: 80px;
+        border-radius: 2px;
+        background: #050508;
+        display: block;
+        border: 1px solid var(--dark-border);
+      }
+
+      .key-display {
+        text-align: center;
+        padding: 15px;
+        background: rgba(255, 0, 255, 0.05);
+        border: 1px solid rgba(255, 0, 255, 0.2);
+        border-radius: 4px;
+        margin-bottom: 20px;
+        opacity: 0;
+        transition: all 0.5s ease;
+      }
+
+      .key-display.visible {
+        opacity: 1;
+      }
+
+      .key-value {
+        font-family: 'Orbitron', sans-serif;
+        font-size: 28px;
+        font-weight: 700;
+        color: var(--neon-magenta);
+        text-shadow: 0 0 15px var(--neon-magenta);
+      }
+
+      .key-label {
+        font-size: 10px;
+        color: var(--text-dim);
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        margin-top: 5px;
+      }
+
+      .key-confidence {
+        font-size: 11px;
+        color: var(--neon-cyan);
+        margin-top: 8px;
       }
     </style>
   </head>
   <body>
     <div class="container">
-      <h1>🎵 BPM Analyzer</h1>
-      <p class="subtitle">Analyze BPM from microphone input in real-time</p>
+      <h1>BPM Analyzer</h1>
+      <p class="subtitle">Real-time microphone analysis // Cyberpunk Edition</p>
 
       <div class="controls">
-        <button id="startBtn">🎤 Start Recording</button>
-        <button id="stopBtn" disabled>⏹ Stop</button>
+        <button id="startBtn">▶ Start</button>
+        <button id="stopBtn" disabled>■ Stop</button>
       </div>
 
       <div class="status" id="status"></div>
+
+      <div class="energy-panel">
+        <div class="energy-header">
+          <span>Energy Level</span>
+          <span class="energy-value"><span id="energyValue">0</span>%</span>
+        </div>
+        <div class="energy-bar">
+          <div class="energy-fill" id="energyFill"></div>
+        </div>
+      </div>
+
+      <div class="spectrum-panel">
+        <div class="spectrum-title">Spectrum Analyzer</div>
+        <canvas id="spectrumCanvas" width="440" height="80"></canvas>
+      </div>
+
+      <div class="key-display" id="keyDisplay">
+        <div class="key-value" id="keyValue">--</div>
+        <div class="key-label">Musical Key</div>
+        <div class="key-confidence" id="keyConfidence"></div>
+      </div>
 
       <div class="bpm-display" id="bpmDisplay">
         <div class="bpm-value" id="bpmValue">--</div>

@@ -1,4 +1,5 @@
 import {findPeaksAtThreshold, computeBpm} from './analyzer';
+import {detectKeySync} from './key-analyzer';
 import type {
   RealTimeBpmAnalyzerOptions,
   RealTimeBpmAnalyzerParameters,
@@ -8,6 +9,8 @@ import type {
   Threshold,
   RealtimeFindPeaksOptions,
   RealtimeAnalyzeChunkOptions,
+  KeyCandidates,
+  ProcessorOutputEvent,
 } from './types';
 import {
   generateValidPeaksModel,
@@ -25,6 +28,8 @@ const initialValue = {
   nextIndexPeaks: () => generateNextIndexPeaksModel(),
   skipIndexes: () => 1,
   effectiveBufferTime: () => 0,
+  accumulatedAudioData: () => new Float32Array(0),
+  lastStableKey: undefined,
 };
 
 /**
@@ -48,6 +53,8 @@ export class RealTimeBpmAnalyzer {
     stabilizationTime: 20000,
     muteTimeInIndexes: 10000,
     debug: false,
+    keyStabilizationTime: consts.defaultKeyStabilizationTime,
+    enableKeyDetection: true,
   };
 
   /**
@@ -71,6 +78,28 @@ export class RealTimeBpmAnalyzer {
    * Computed values
    */
   computedStabilizationTimeInSeconds = 0;
+  /**
+   * Key detection - accumulated audio data
+   */
+  accumulatedAudioData: Float32Array = initialValue.accumulatedAudioData();
+  /**
+   * Last stable key detected
+   */
+  lastStableKey: KeyCandidates | undefined = initialValue.lastStableKey;
+  /**
+   * Key stabilization time in seconds
+   */
+  computedKeyStabilizationTimeInSeconds = 0;
+  /**
+   * Audio sample rate for key detection
+   */
+  audioSampleRate = 44100;
+
+  /**
+   * Key detection throttling - private fields must be declared after public fields
+   */
+  private lastKeyDetectionTime = 0;
+  private keyDetectionInProgress = false;
 
   constructor(options: RealTimeBpmAnalyzerParameters = {}) {
     Object.assign(this.options, options);
@@ -82,6 +111,7 @@ export class RealTimeBpmAnalyzer {
    */
   updateComputedValues() {
     this.computedStabilizationTimeInSeconds = this.options.stabilizationTime / 1000;
+    this.computedKeyStabilizationTimeInSeconds = this.options.keyStabilizationTime / 1000;
   }
 
   /**
@@ -93,6 +123,8 @@ export class RealTimeBpmAnalyzer {
     this.nextIndexPeaks = initialValue.nextIndexPeaks();
     this.skipIndexes = initialValue.skipIndexes();
     this.effectiveBufferTime = initialValue.effectiveBufferTime();
+    this.accumulatedAudioData = initialValue.accumulatedAudioData();
+    this.lastStableKey = initialValue.lastStableKey;
   }
 
   /**
@@ -121,61 +153,149 @@ export class RealTimeBpmAnalyzer {
    * @param options.postMessage - Function to post a message to the processor node
    */
   async analyzeChunk({audioSampleRate, channelData, bufferSize, postMessage}: RealtimeAnalyzeChunkOptions): Promise<void> {
-    if (this.options.debug) {
-      postMessage({type: 'analyzeChunk', data: channelData});
+    try {
+      // Input validation
+      if (!channelData || channelData.length === 0 || audioSampleRate <= 0) {
+        return;
+      }
+
+      if (this.options.debug) {
+        postMessage({type: 'analyzeChunk', data: channelData});
+      }
+
+      // We are summing up the size of each analyzed chunks in order to compute later if we reached the stabilizationTime
+      // Ex: effectiveBufferTime / audioSampleRate = timeInSeconds (1000000/44100=22s)
+      this.effectiveBufferTime += bufferSize;
+
+      // Compute the maximum index with all previous chunks
+      const currentMaxIndex = bufferSize * this.skipIndexes;
+
+      // Compute the minimum index with all previous chunks
+      const currentMinIndex = currentMaxIndex - bufferSize;
+
+      // Mutate nextIndexPeaks and validPeaks if possible
+      await this.findPeaks({
+        audioSampleRate,
+        channelData,
+        bufferSize,
+        currentMinIndex,
+        currentMaxIndex,
+        postMessage,
+      });
+
+      // Increment chunk
+      this.skipIndexes++;
+
+      const data: BpmCandidates = await computeBpm({audioSampleRate, data: this.validPeaks});
+      const {threshold} = data;
+      postMessage({type: 'bpm', data});
+
+      // If the results found have a "high" threshold, the BPM is considered stable/strong
+      if (this.minValidThreshold < threshold) {
+        postMessage({type: 'bpmStable', data});
+        await this.clearValidPeaks(threshold);
+      }
+
+      // Key detection with throttling
+      if (this.options.enableKeyDetection) {
+        await this.processKeyDetection(audioSampleRate, channelData, postMessage);
+      }
+
+      // After x time, we reinit the analyzer
+      if (this.options.continuousAnalysis && this.effectiveBufferTime / audioSampleRate > this.computedStabilizationTimeInSeconds) {
+        this.reset();
+        postMessage({type: 'analyzerReset'});
+      }
+    } catch (error) {
+      // Error handling to prevent AudioWorklet crash
+      postMessage({
+        type: 'error',
+        data: {
+          message: error instanceof Error ? error.message : 'Unknown error in analyzeChunk',
+          error: error instanceof Error ? error : new Error(String(error)),
+        },
+      });
+    }
+  }
+
+  /**
+   * Process key detection with throttling and error handling
+   */
+  private async processKeyDetection(
+    audioSampleRate: number,
+    channelData: Float32Array,
+    postMessage: (data: ProcessorOutputEvent) => void,
+  ): Promise<void> {
+    const now = performance.now();
+
+    // Throttling: avoid running key detection on every chunk
+    if (now - this.lastKeyDetectionTime < consts.keyDetectionIntervalMs) {
+      return;
     }
 
-    /**
-     * We are summing up the size of each analyzed chunks in order to compute later if we reached the stabilizationTime
-     * Ex: effectiveBufferTime / audioSampleRate = timeInSeconds (1000000/44100=22s)
-     */
-    this.effectiveBufferTime += bufferSize;
-
-    /**
-     * Compute the maximum index with all previous chunks
-     */
-    const currentMaxIndex = bufferSize * this.skipIndexes;
-
-    /**
-     * Compute the minimum index with all previous chunks
-     */
-    const currentMinIndex = currentMaxIndex - bufferSize;
-
-    /**
-     * Mutate nextIndexPeaks and validPeaks if possible
-     */
-    await this.findPeaks({
-      audioSampleRate,
-      channelData,
-      bufferSize,
-      currentMinIndex,
-      currentMaxIndex,
-      postMessage,
-    });
-
-    /**
-     * Increment chunk
-     */
-    this.skipIndexes++;
-
-    const data: BpmCandidates = await computeBpm({audioSampleRate, data: this.validPeaks});
-    const {threshold} = data;
-    postMessage({type: 'bpm', data});
-
-    /**
-     * If the results found have a "high" threshold, the BPM is considered stable/strong
-     */
-    if (this.minValidThreshold < threshold) {
-      postMessage({type: 'bpmStable', data});
-      await this.clearValidPeaks(threshold);
+    // Prevent parallel execution
+    if (this.keyDetectionInProgress) {
+      return;
     }
 
-    /**
-     * After x time, we reinit the analyzer
-     */
-    if (this.options.continuousAnalysis && this.effectiveBufferTime / audioSampleRate > this.computedStabilizationTimeInSeconds) {
-      this.reset();
-      postMessage({type: 'analyzerReset'});
+    this.keyDetectionInProgress = true;
+    this.lastKeyDetectionTime = now;
+
+    try {
+      // Accumulate audio data with memory limit
+      const maxSamples = audioSampleRate * consts.maxAudioBufferSeconds;
+      const newLength = Math.min(
+        this.accumulatedAudioData.length + channelData.length,
+        maxSamples,
+      );
+
+      if (this.accumulatedAudioData.length < maxSamples) {
+        const newBuffer = new Float32Array(newLength);
+        newBuffer.set(this.accumulatedAudioData, 0);
+        const remaining = newLength - this.accumulatedAudioData.length;
+        newBuffer.set(channelData.slice(0, remaining), this.accumulatedAudioData.length);
+        this.accumulatedAudioData = newBuffer;
+      }
+
+      // Check if enough audio has been accumulated
+      const minSamples = audioSampleRate * consts.keyDetectionMinSeconds;
+      if (this.accumulatedAudioData.length < minSamples) {
+        return;
+      }
+
+      const effectiveTime = this.effectiveBufferTime / audioSampleRate;
+
+      // Execute key detection
+      const keyData = detectKeySync({
+        audioSampleRate,
+        channelData: this.accumulatedAudioData,
+      });
+
+      postMessage({type: 'key', data: keyData});
+
+      // Determine stable key
+      const {key, mode, confidence} = keyData;
+      const isConfidentEnough = confidence > consts.keyConfidenceThreshold;
+      const isTimeReached = effectiveTime >= this.computedKeyStabilizationTimeInSeconds;
+      const hasKeyChanged = !this.lastStableKey
+        || this.lastStableKey.key !== key
+        || this.lastStableKey.mode !== mode;
+
+      if (isConfidentEnough && isTimeReached && hasKeyChanged) {
+        this.lastStableKey = keyData;
+        postMessage({type: 'keyStable', data: keyData});
+      }
+    } catch (keyError) {
+      // Key detection failure should not affect main flow
+      postMessage({
+        type: 'error',
+        data: {
+          message: keyError instanceof Error ? keyError.message : 'Key detection failed',
+          error: keyError instanceof Error ? keyError : new Error(String(keyError)),
+        },
+      });
+    } finally {
+      this.keyDetectionInProgress = false;
     }
   }
 
@@ -189,6 +309,7 @@ export class RealTimeBpmAnalyzer {
    * @param options.currentMaxIndex - Current maximum index
    * @param options.postMessage - Function to post a message to the processor node
    */
+  // eslint-disable-next-line @typescript-eslint/member-ordering
   async findPeaks({
     audioSampleRate,
     channelData,

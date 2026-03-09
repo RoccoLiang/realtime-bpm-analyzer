@@ -1,4 +1,9 @@
 import { createRealtimeBpmAnalyzer, getBiquadFilter, type BpmAnalyzer, type BpmCandidates } from 'realtime-bpm-analyzer';
+import {
+  createEnergyMonitor,
+  createSpectrumMonitor,
+  type EnergySnapshot,
+} from '../../shared/microphone-session';
 
 // Get DOM elements
 const audioUrlInput = document.getElementById('audioUrl') as HTMLInputElement;
@@ -9,6 +14,11 @@ const stopBtn = document.getElementById('stopBtn') as HTMLButtonElement;
 const statusElement = document.getElementById('status') as HTMLDivElement;
 const bpmDisplay = document.getElementById('bpmDisplay') as HTMLDivElement;
 const bpmValue = document.getElementById('bpmValue') as HTMLDivElement;
+const energyValue = document.getElementById('energyValue') as HTMLSpanElement;
+const energyLevel = document.getElementById('energyLevel') as HTMLSpanElement;
+const energyFill = document.getElementById('energyFill') as HTMLDivElement;
+const spectrumCanvas = document.getElementById('spectrumCanvas') as HTMLCanvasElement;
+const spectrumContext = spectrumCanvas.getContext('2d');
 
 let audioContext: AudioContext | null = null;
 
@@ -23,6 +33,9 @@ let audioElement: HTMLAudioElement | null = null;
 let mediaSource: MediaElementAudioSourceNode | null = null;
 let bpmAnalyzer: BpmAnalyzer | null = null;
 let biquadFilter: BiquadFilterNode | null = null;
+let analyserNode: AnalyserNode | null = null;
+let stopEnergyMonitor: (() => void) | null = null;
+let stopSpectrumMonitor: (() => void) | null = null;
 
 // Load audio from URL
 loadBtn.addEventListener('click', async () => {
@@ -54,6 +67,8 @@ loadBtn.addEventListener('click', async () => {
 
     // Create biquad filter for better audio processing
     biquadFilter = getBiquadFilter(audioCtx);
+    analyserNode = audioCtx.createAnalyser();
+    analyserNode.fftSize = 1024;
 
     // Listen for BPM stable events
     bpmAnalyzer.on('bpmStable', (data: BpmCandidates) => {
@@ -69,8 +84,11 @@ loadBtn.addEventListener('click', async () => {
     
     // Connect: source → filter → analyzer → destination
     mediaSource.connect(biquadFilter);
+    mediaSource.connect(analyserNode);
     biquadFilter.connect(bpmAnalyzer.node);
     mediaSource.connect(audioCtx.destination);
+    stopEnergyMonitor = createEnergyMonitor(analyserNode, onEnergySnapshot);
+    stopSpectrumMonitor = createSpectrumMonitor(analyserNode, drawSpectrum);
 
     // Wait for audio to be ready
     await new Promise<void>((resolve, reject) => {
@@ -141,6 +159,50 @@ function displayBpm(bpm: number) {
   bpmDisplay.classList.add('visible');
 }
 
+function onEnergySnapshot(snapshot: EnergySnapshot) {
+  const score = Math.round(snapshot.score);
+  energyValue.textContent = String(score);
+  energyLevel.textContent = snapshot.level;
+  energyFill.style.width = `${score}%`;
+}
+
+function resetEnergy() {
+  energyValue.textContent = '0';
+  energyLevel.textContent = 'Low';
+  energyFill.style.width = '0%';
+}
+
+function drawSpectrum(bins: Uint8Array) {
+  if (!spectrumContext) return;
+  const { width, height } = spectrumCanvas;
+  spectrumContext.clearRect(0, 0, width, height);
+  spectrumContext.fillStyle = '#10121a';
+  spectrumContext.fillRect(0, 0, width, height);
+
+  const bars = 48;
+  const step = Math.max(1, Math.floor(bins.length / bars));
+  const barWidth = width / bars;
+
+  for (let i = 0; i < bars; i++) {
+    const value = bins[i * step] / 255;
+    const barHeight = value * height;
+    const x = i * barWidth;
+    const y = height - barHeight;
+    spectrumContext.fillStyle = 'hsl(' + (120 - value * 120) + ' 85% 55%)';
+    spectrumContext.fillRect(x + 1, y, barWidth - 2, barHeight);
+  }
+}
+
+function clearSpectrum() {
+  if (!spectrumContext) return;
+  const { width, height } = spectrumCanvas;
+  spectrumContext.clearRect(0, 0, width, height);
+  spectrumContext.fillStyle = '#10121a';
+  spectrumContext.fillRect(0, 0, width, height);
+}
+
+clearSpectrum();
+
 function hideBpm() {
   bpmDisplay.classList.remove('visible');
   bpmValue.textContent = '--';
@@ -169,10 +231,28 @@ function cleanup() {
     biquadFilter = null;
   }
 
+  if (analyserNode) {
+    analyserNode.disconnect();
+    analyserNode = null;
+  }
+
   if (bpmAnalyzer) {
     bpmAnalyzer.disconnect();
     bpmAnalyzer = null;
   }
+
+  if (stopEnergyMonitor) {
+    stopEnergyMonitor();
+    stopEnergyMonitor = null;
+  }
+
+  if (stopSpectrumMonitor) {
+    stopSpectrumMonitor();
+    stopSpectrumMonitor = null;
+  }
+
+  resetEnergy();
+  clearSpectrum();
 }
 
 // Cleanup on page unload

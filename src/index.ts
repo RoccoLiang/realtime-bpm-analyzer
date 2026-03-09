@@ -5,6 +5,7 @@ import {BpmAnalyzer} from './core/bpm-analyzer';
 
 export * from './core/realtime-bpm-analyzer';
 export {analyzeFullBuffer, getBiquadFilter} from './core/analyzer';
+export {detectKey, detectKeySync} from './core/key-analyzer';
 export * from './core/types';
 export {BpmAnalyzer} from './core/bpm-analyzer';
 

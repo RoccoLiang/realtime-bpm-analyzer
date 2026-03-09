@@ -6,27 +6,11 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 cd "$ROOT_DIR"
 
 EXAMPLES=(
-  "01-vanilla-basic"
-  "02-vanilla-streaming"
   "03-vanilla-microphone"
-  "04-react-basic"
-  "05-react-streaming"
-  "06-react-microphone"
-  "07-vue-basic"
-  "08-vue-streaming"
-  "09-vue-microphone"
 )
 
 EXAMPLE_LABELS=(
-  "原生 JavaScript - 基本版（上傳音檔）"
-  "原生 JavaScript - 串流版"
-  "原生 JavaScript - 麥克風即時分析"
-  "React - 基本版（上傳音檔）"
-  "React - 串流版"
-  "React - 麥克風即時分析"
-  "Vue - 基本版（上傳音檔）"
-  "Vue - 串流版"
-  "Vue - 麥克風即時分析"
+  "Vanilla JS - 麥克風即時分析 (Cyberpunk + Key 偵測)"
 )
 
 echo "請選擇要啟動的範例："

@@ -273,6 +273,16 @@ export class BpmAnalyzer extends EventTarget {
           break;
         }
 
+        case 'key': {
+          this.emit('key', eventData.data);
+          break;
+        }
+
+        case 'keyStable': {
+          this.emit('keyStable', eventData.data);
+          break;
+        }
+
         case 'analyzerReset': {
           this.emit('analyzerReset', undefined as void);
           break;
