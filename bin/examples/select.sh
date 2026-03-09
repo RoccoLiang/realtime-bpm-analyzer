@@ -63,6 +63,11 @@ echo ""
 echo "按下 Ctrl+C 或 Ctrl+\\ 停止服務"
 echo ""
 
+if [[ ! -x "examples/$SELECTED_EXAMPLE/node_modules/.bin/vite" ]]; then
+  echo "安裝範例依賴..."
+  npm --prefix "examples/$SELECTED_EXAMPLE" install
+fi
+
 # Run dev server and wait for it
 npm --prefix "examples/$SELECTED_EXAMPLE" run dev &
 DEV_SERVER_PID=$!
