@@ -63,6 +63,7 @@ export class RealTimeBpmProcessor extends AudioWorkletProcessor {
   aggregate: (pcmData: Float32Array) => AggregateData;
   realTimeBpmAnalyzer: RealTimeBpmAnalyzer;
   stopped = false;
+  private analysisInProgress = false;
 
   constructor(options: AudioWorkletProcessorParameters) {
     super(options);
@@ -78,8 +79,27 @@ export class RealTimeBpmProcessor extends AudioWorkletProcessor {
    * Handle message event
    * @param _event Contain event data from main process
    */
-  onMessage(_event: ProcessorInputMessage): void {
-    // Handle custom message client
+  onMessage(event: ProcessorInputMessage): void {
+    if (!event?.data) {
+      return;
+    }
+
+    // eslint-disable-next-line default-case -- only reset/stop are valid control messages
+    switch (event.data.type) {
+      case 'reset': {
+        this.stopped = false;
+        this.realTimeBpmAnalyzer.reset();
+        this.port.postMessage({type: 'analyzerReset'});
+        break;
+      }
+
+      case 'stop': {
+        this.stopped = true;
+        this.realTimeBpmAnalyzer.reset();
+        this.port.postMessage({type: 'analyzerReset'});
+        break;
+      }
+    }
   }
 
   /**
@@ -102,7 +122,8 @@ export class RealTimeBpmProcessor extends AudioWorkletProcessor {
 
     const {isBufferFull, buffer, bufferSize} = this.aggregate(currentChunk);
 
-    if (isBufferFull) {
+    if (isBufferFull && !this.analysisInProgress) {
+      this.analysisInProgress = true;
       // The variable sampleRate is global ! thanks to the AudioWorkletProcessor
       this.realTimeBpmAnalyzer.analyzeChunk({audioSampleRate: sampleRate, channelData: buffer, bufferSize, postMessage: event => {
         this.port.postMessage(event);
@@ -115,6 +136,8 @@ export class RealTimeBpmProcessor extends AudioWorkletProcessor {
             error: error instanceof Error ? error : new Error(String(error)),
           },
         });
+      }).finally(() => {
+        this.analysisInProgress = false;
       });
     }
 

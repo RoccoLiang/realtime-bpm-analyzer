@@ -25,7 +25,7 @@ export type ProcessorInputEvent =
  * @group Events
  */
 export type ProcessorInputMessage = {
-  data: ProcessorInputEvent;
+  data?: ProcessorInputEvent;
 };
 
 /**

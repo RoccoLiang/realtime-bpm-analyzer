@@ -9,6 +9,8 @@ export {detectKey, detectKeySync} from './core/key-analyzer';
 export * from './core/types';
 export {BpmAnalyzer} from './core/bpm-analyzer';
 
+const workletModuleLoaders = new WeakMap<AudioContext, Promise<void>>();
+
 /**
  * Creates a real-time BPM analyzer for live audio streams.
  *
@@ -149,20 +151,24 @@ export const createRealTimeBpmProcessor = createRealtimeBpmAnalyzer;
  * @returns Recording node related components for the app.
  */
 async function setupAudioWorkletNode(audioContext: AudioContext, processorName: string, processorOptions?: RealTimeBpmAnalyzerParameters): Promise<AudioWorkletNode> {
-  const blob = new Blob([realtimeBpmProcessorContent], {type: 'application/javascript'});
+  const existingModuleLoader = workletModuleLoaders.get(audioContext);
 
-  const objectUrl = URL.createObjectURL(blob);
+  if (existingModuleLoader) {
+    await existingModuleLoader;
+  } else {
+    const blob = new Blob([realtimeBpmProcessorContent], {type: 'application/javascript'});
+    const objectUrl = URL.createObjectURL(blob);
 
-  try {
-    await audioContext.audioWorklet.addModule(objectUrl);
+    const moduleLoader = audioContext.audioWorklet.addModule(objectUrl)
+      .finally(() => {
+        URL.revokeObjectURL(objectUrl);
+      });
 
-    const audioWorkletNode = new AudioWorkletNode(audioContext, processorName, {
-      processorOptions,
-    });
-
-    return audioWorkletNode;
-  } finally {
-    // Clean up the blob URL to prevent memory leaks
-    URL.revokeObjectURL(objectUrl);
+    workletModuleLoaders.set(audioContext, moduleLoader);
+    await moduleLoader;
   }
+
+  return new AudioWorkletNode(audioContext, processorName, {
+    processorOptions,
+  });
 }

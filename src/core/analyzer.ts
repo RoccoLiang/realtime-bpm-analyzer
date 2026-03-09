@@ -267,10 +267,19 @@ export function identifyIntervals(peaks: Peaks): Interval[] {
   const intervals: Interval[] = [];
 
   for (let n = 0; n < peaks.length; n++) {
-    for (let i = 0; i < consts.maxIntervalComparisons; i++) {
+    for (let i = 1; i <= consts.maxIntervalComparisons; i++) {
       const peak = peaks[n];
       const peakIndex = n + i;
+
+      if (peakIndex >= peaks.length) {
+        break;
+      }
+
       const interval = peaks[peakIndex] - peak;
+
+      if (!Number.isFinite(interval) || interval === 0) {
+        continue;
+      }
 
       /**
        * Try and find a matching interval and increase it's count

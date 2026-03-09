@@ -8,7 +8,7 @@ cd "$ROOT_DIR"
 # Cleanup function
 cleanup() {
   echo ""
-  echo "👋 結束程式"
+  echo "結束程式"
   exit 0
 }
 

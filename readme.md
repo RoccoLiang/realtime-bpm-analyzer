@@ -1,13 +1,13 @@
 # 🎵 Realtime BPM Analyzer
 
 [![npm](https://img.shields.io/npm/v/realtime-bpm-analyzer.svg)](https://www.npmjs.com/package/realtime-bpm-analyzer)
-[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](license.md)
 
 A dependency-free TypeScript library for real-time BPM (Tempo) and Musical Key detection using the Web Audio API.
 
 ## ✨ Features
 
-- **Zero Dependencies** - Pure Web Audio API implementation
+- **Zero Runtime Dependencies** - Pure Web Audio API implementation
 - **Real-time BPM Detection** - Analyze audio as it plays
 - **Musical Key Detection** - Detect key (C, C#, D, etc.) and mode (major/minor)
 - **Microphone Input** - Live audio analysis from microphone
@@ -16,6 +16,14 @@ A dependency-free TypeScript library for real-time BPM (Tempo) and Musical Key d
 - **Cyberpunk UI** - Modern neon-styled example included
 
 ## 📦 Installation
+
+If you want to use this fork (`RoccoLiang/realtime-bpm-analyzer`), install from GitHub:
+
+```bash
+npm install github:RoccoLiang/realtime-bpm-analyzer
+```
+
+If you want the npm registry release, use:
 
 ```bash
 npm install realtime-bpm-analyzer
@@ -83,7 +91,7 @@ const tempos = await analyzeFullBuffer(audioBuffer);
 console.log('Detected BPM:', tempos[0].tempo);
 ```
 
-### `detectKey(audioBuffer)`
+### `detectKey({ audioSampleRate, channelData })`
 
 Detect Musical Key from audio data.
 

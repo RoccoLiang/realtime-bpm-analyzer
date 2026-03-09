@@ -73,19 +73,18 @@ export function chunkAggregator(bufferSize = consts.defaultBufferSize): (pcmData
   /**
    * Track the current buffer fill level.
    */
-  let _bytesWritten = 0;
+  let bytesWritten = 0;
 
   /**
    * Create a buffer of fixed size.
    */
-  let buffer: Float32Array = new Float32Array(0);
+  const buffer: Float32Array = new Float32Array(bufferSize);
 
   /**
    * Initialize the buffer.
    */
   function initBuffer(): void {
-    _bytesWritten = 0;
-    buffer = new Float32Array(0);
+    bytesWritten = 0;
   }
 
   /**
@@ -93,7 +92,7 @@ export function chunkAggregator(bufferSize = consts.defaultBufferSize): (pcmData
    * @returns True if the buffer is full, otherwise false.
    */
   function isBufferFull(): boolean {
-    return _bytesWritten === bufferSize;
+    return bytesWritten >= bufferSize;
   }
 
   /**
@@ -113,15 +112,14 @@ export function chunkAggregator(bufferSize = consts.defaultBufferSize): (pcmData
       flush();
     }
 
-    const newBuffer = new Float32Array(buffer.length + pcmData.length);
-    newBuffer.set(buffer, 0);
-    newBuffer.set(pcmData, buffer.length);
-    buffer = newBuffer;
-    _bytesWritten += pcmData.length;
+    const remaining = bufferSize - bytesWritten;
+    const copyLength = Math.min(remaining, pcmData.length);
+    buffer.set(pcmData.subarray(0, copyLength), bytesWritten);
+    bytesWritten += copyLength;
 
     return {
       isBufferFull: isBufferFull(),
-      buffer,
+      buffer: isBufferFull() ? buffer : buffer.subarray(0, bytesWritten),
       bufferSize,
     };
   };

@@ -52,6 +52,8 @@
   "scripts": {
     "dev": "cd examples/03-vanilla-microphone && npm run dev",
     "build": "bash bin/build/library.sh",
+    "ensure:dist": "bash bin/examples/ensure-dist.sh",
+    "examples:select": "bash bin/examples/select.sh",
     "lint": "xo",
     "lint:fix": "xo --fix",
     "prepare": "husky"
